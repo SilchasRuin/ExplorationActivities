@@ -39,6 +39,6 @@ public abstract class ModData
 
     public static class Skills
     {
-        public static readonly Skill WarfareLore = ModManager.RegisterEnumMember<Skill>("WarfareLore");
+        public static readonly Skill WarfareLore = ModManager.RegisterEnumMember<Skill>("Warfare Lore");
     }
 }

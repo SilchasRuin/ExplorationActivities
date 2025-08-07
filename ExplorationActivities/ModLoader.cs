@@ -37,7 +37,12 @@ public class ModLoader
         }
         ModManager.RegisterActionOnEachCharacterSheet(sheet =>
         {
-            sheet.Calculated.AddSelectionOption(new SingleFeatSelectionOption("ExplorationSelections", "Exploration Activity", SelectionOption.PRECOMBAT_PREPARATIONS_LEVEL, feat => feat.HasTrait(ModData.Traits.ExplorationActivity)));
+            sheet.Calculated.AddAtLevel(1, values =>
+            {
+                values.AddSelectionOption(new SingleFeatSelectionOption("ExplorationSelections",
+                    "Exploration Activity", SelectionOption.PRECOMBAT_PREPARATIONS_LEVEL,
+                    feat => feat.HasTrait(ModData.Traits.ExplorationActivity)).WithIsOptional());
+            });
         });
         ExplorationSpells.RegisterSpells();
         ModManager.RegisterActionOnEachCreature(cr =>
@@ -50,8 +55,8 @@ public class ModLoader
                         Creature self = effect.Owner;
                         Creature? target = action.ChosenTargets.ChosenCreature;
                         var warfareMinusSociety = self.Skills.Get(ModData.Skills.WarfareLore) - self.Skills.Get(Skill.Society);
-                        if (target != null && (action is { Name: "Recall Weakness" } && warfareMinusSociety > 0
-                                  && target.Traits.Contains(Trait.Human) || target.Traits.Contains(Trait.Humanoid) || target.Traits.Contains(Trait.Orc) || target.Traits.Contains(Trait.Kobold) || target.Traits.Contains(Trait.Merfolk)))
+                        if (target != null && action is { Name: "Recall Weakness" } && warfareMinusSociety > 0
+                            && (target.Traits.Contains(Trait.Human) || target.Traits.Contains(Trait.Humanoid) || target.Traits.Contains(Trait.Orc) || target.Traits.Contains(Trait.Kobold) || target.Traits.Contains(Trait.Merfolk)))
                             action.WithActiveRollSpecification(new ActiveRollSpecification(
                                 TaggedChecks.SkillCheck(ModData.Skills.WarfareLore),
                                 Checks.FlatDC(Checks.LevelBasedDC(target.Level))));
@@ -59,5 +64,16 @@ public class ModLoader
                     }
                 });
         });
+        if (ModManager.TryParse("Fount of Knowledge", out FeatName fountOfKnowledge))
+        {
+            ModManager.RegisterActionOnEachCreature(cr =>
+            {
+                if (cr.HasFeat(fountOfKnowledge))
+                    cr.AddQEffect(new QEffect()
+                    {
+                        BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
+                    });
+            });
+        }
     }
 }

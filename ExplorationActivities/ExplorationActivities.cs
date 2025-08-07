@@ -25,7 +25,7 @@ public abstract class ExplorationActivities
             [ModData.Traits.ExplorationActivity], null);
         CreateScoutLogic(scout);
         yield return scout;
-        Feat avoidNotice = new(ModData.FeatNames.AvoidNotice, "You move quietly and carefully, avoiding your enemies' detection", "You roll stealth instead of perception for initiative and if you have cover may be hidden at the start of an encounter",
+        Feat avoidNotice = new(ModData.FeatNames.AvoidNotice, "You move quietly and carefully, avoiding your enemies' detection.", "You roll stealth instead of perception for initiative and if you have cover may be hidden at the start of an encounter.",
             [ModData.Traits.ExplorationActivity], null);
         CreateAvoidNoticeLogic(avoidNotice);
         yield return avoidNotice;

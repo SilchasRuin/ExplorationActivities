@@ -24,7 +24,7 @@ public abstract class ExplorationSpells
     public static SpellId GlassShield { get; private set; }
     public static void RegisterSpells()
     {
-        MusicalAccompaniment = ModManager.RegisterNewSpell("MusicalAccompaniment", 1, (_, _, _, _, _) =>
+        MusicalAccompaniment = ModManager.RegisterNewSpell("MusicalAccompaniment", 0, (_, _, _, _, _) =>
         {
             return Spells.CreateModern(IllustrationName.CounterPerformance, "Musical Accompaniment", [Trait.Auditory, Trait.Cantrip, Trait.Illusion, Trait.Manipulate, Trait.Concentrate, Trait.Occult, Trait.Arcane], 
                     "You're surrounded by orchestral music that shifts and changes to match your behavior.", "You gain a +1 status bonus to Performance checks. You take a –4 penalty to Stealth checks while the music is playing. You can Dismiss this spell.",
@@ -53,7 +53,7 @@ public abstract class ExplorationSpells
                     });
                 });
         });
-        GlassShield = ModManager.RegisterNewSpell("GlassShield", 1, (_, _, level, inCombat, _) =>
+        GlassShield = ModManager.RegisterNewSpell("GlassShield", 0, (_, _, level, inCombat, _) =>
         {
             var shieldHardness = level < 5 ? (level + 1) / 2 * 2 : level < 7 ? 7 : (level + 1) / 2 * 2 + 2;
             var str6 = shieldHardness.ToString();
@@ -66,7 +66,7 @@ public abstract class ExplorationSpells
             var description3 =
                 $"You gain a +1 circumstance bonus to AC until the start of your next turn.\n\nWhile the spell is in effect, you can use the Shield Block reaction with your magic shield to prevent {str6} damage.\n\nWhen you Shield Block, the shield explodes in a shower of glass. If the creature that broke it is within 5 feet, the shards deal {diceFormula} piercing damage to that creature with a basic Reflex save. After you use Shield Block, the spell ends and you can't cast it again this encounter.";
             return Spells
-                .CreateModern(  IllustrationName.SunderShield/*new ModdedIllustration("ExAssets/Glass.png")*/, "Glass Shield",
+                .CreateModern(  IllustrationName.SunderShield, "Glass Shield",
                     [Trait.Cantrip, Trait.Concentrate, Trait.Arcane, Trait.Primal, Trait.Earth],
                     "You summon a layer of clear glass to keep you from harm.", description3, target1, level, null)
                 .WithActionCost(1).WithSoundEffect(SfxName.ShieldSpell)
