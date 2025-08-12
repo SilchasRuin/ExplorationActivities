@@ -1,4 +1,5 @@
-﻿using Dawnsbury.Core;
+﻿using Dawnsbury.Auxiliary;
+using Dawnsbury.Core;
 using Dawnsbury.Core.CharacterBuilder.AbilityScores;
 using Dawnsbury.Core.CharacterBuilder.Feats;
 using Dawnsbury.Core.CharacterBuilder.Spellcasting;
@@ -14,6 +15,7 @@ using Dawnsbury.Core.Possibilities;
 using Dawnsbury.Core.Tiles;
 using Dawnsbury.Modding;
 using Dawnsbury.Mods.DawnniExpanded;
+using static ExplorationActivities.ModData;
 
 namespace ExplorationActivities;
 
@@ -21,15 +23,15 @@ public abstract class ExplorationActivities
 {
     public static IEnumerable<Feat> ExplorationFeats()
     {
-        Feat scout = new(ModData.FeatNames.ScoutActivity, "You scout ahead and behind the group to watch danger.", "At the start of the next encounter, every creature in your party gains a +1 circumstance bonus to their initiative rolls.",
+        Feat scout = new(FeatNames.ScoutActivity, "You scout ahead and behind the group to watch danger.", "At the start of the next encounter, every creature in your party gains a +1 circumstance bonus to their initiative rolls.",
             [ModData.Traits.ExplorationActivity], null);
         CreateScoutLogic(scout);
         yield return scout;
-        Feat avoidNotice = new(ModData.FeatNames.AvoidNotice, "You move quietly and carefully, avoiding your enemies' detection.", "You roll stealth instead of perception for initiative and if you have cover may be hidden at the start of an encounter.",
+        Feat avoidNotice = new(FeatNames.AvoidNotice, "You move quietly and carefully, avoiding your enemies' detection.", "You roll stealth instead of perception for initiative and if you have cover may be hidden at the start of an encounter.",
             [ModData.Traits.ExplorationActivity], null);
         CreateAvoidNoticeLogic(avoidNotice);
         yield return avoidNotice;
-        Feat hustle = new(ModData.FeatNames.Hustle, "You strain yourself for an extra boost of speed.", "On your first turn, you gain a +5 circumstance bonus to speed, or a +10 circumstance bonus to speed if your Constitution modifier is +4 or higher.", 
+        Feat hustle = new(FeatNames.Hustle, "You strain yourself for an extra boost of speed.", "On your first turn, you gain a +5 circumstance bonus to speed, or a +10 circumstance bonus to speed if your Constitution modifier is +4 or higher.", 
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateHustleLogic(hustle);
         yield return hustle;
@@ -60,23 +62,23 @@ public abstract class ExplorationActivities
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateTrackLogic(track);
         yield return track;
-        Feat deceptiveApproach = new TrueFeat(ModData.FeatNames.DeceptiveApproach, 2, "You know how to misdirect people's expectations to get the drop on them.", "You may select the {b}Impersonate{/b} exploration activity, which allows you to roll deception instead of perception for initiative.", [Trait.Homebrew, Trait.General, Trait.Skill])
+        Feat deceptiveApproach = new TrueFeat(FeatNames.DeceptiveApproach, 2, "You know how to misdirect people's expectations to get the drop on them.", "You may select the {b}Impersonate{/b} exploration activity, which allows you to roll deception instead of perception for initiative.", [Trait.Homebrew, Trait.General, Trait.Skill])
             .WithPrerequisite(values => values.GetProficiency(Trait.Deception) >= Proficiency.Expert, "You must be an expert in Deception.");
         yield return deceptiveApproach;
         Feat impersonate = new(ModManager.RegisterFeatName("Impersonate"), "You surprise your foes by pretending to be something you're not.", "You roll deception instead of perception for initiative.",
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateImpersonateLogic(impersonate);
         yield return impersonate;
-        Feat gladHand = new TrueFeat(ModData.FeatNames.GladHand, 2, "First impressions are your strong suit, even those hostile to you sometimes hesitate to attack.", "You may select the {b}Make an Impression{/b} exploration activity, which allows you to roll persuasion instead of perception for initiative.", [Trait.Homebrew, Trait.General, Trait.Skill])
+        Feat gladHand = new TrueFeat(FeatNames.GladHand, 2, "First impressions are your strong suit, even those hostile to you sometimes hesitate to attack.", "You may select the {b}Make an Impression{/b} exploration activity, which allows you to roll persuasion instead of perception for initiative.", [Trait.Homebrew, Trait.General, Trait.Skill])
             .WithPrerequisite(values => values.GetProficiency(Trait.Diplomacy) >= Proficiency.Expert, "You must be an expert in Diplomacy.");
         yield return gladHand;
         Feat makeAnImpression = new(ModManager.RegisterFeatName("Make an Impression"), "You're so charming your foes may hesitate to attack.", "You roll persuasion instead of perception for initiative.",
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateMakeAnImpressionLogic(makeAnImpression);
         yield return makeAnImpression;
-        Feat imposingPresence = new TrueFeat(ModData.FeatNames.ImposingPresence, 2,
+        Feat imposingPresence = new TrueFeat(FeatNames.ImposingPresence, 2,
                 "One look at you makes your enemies hesitate.",
-                "You may select the {b}Coerce{/b} exploration activity, which allows you to roll persuasion instead of perception for initiative.",
+                "You may select the {b}Coerce{/b} exploration activity, which allows you to roll intimidation instead of perception for initiative.",
                 [Trait.General, Trait.Skill, Trait.Homebrew])
             .WithPrerequisite(values => values.GetProficiency(Trait.Intimidation) >= Proficiency.Expert, "You must be an expert in Intimidation.");
         yield return imposingPresence;
@@ -84,18 +86,18 @@ public abstract class ExplorationActivities
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateCoerceLogic(coerce);
         yield return coerce;
-        Feat warfareLore = new SkillSelectionFeat(ModData.FeatNames.WarfareLore, ModData.Skills.WarfareLore, ModData.Traits.WarfareLore);
+        Feat warfareLore = new SkillSelectionFeat(FeatNames.WarfareLore, Skills.WarfareLore, ModData.Traits.WarfareLore);
         yield return warfareLore;
-        Feat expertWarfareLore = new SkillIncreaseFeat(ModData.FeatNames.WarfareLoreExpert, ModData.Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Expert, ModData.FeatNames.WarfareLore);
+        Feat expertWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreExpert, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Expert, FeatNames.WarfareLore);
         yield return expertWarfareLore;
-        Feat masterWarfareLore = new SkillIncreaseFeat(ModData.FeatNames.WarfareLoreMaster, ModData.Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Master, ModData.FeatNames.WarfareLoreExpert);
+        Feat masterWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreMaster, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Master, FeatNames.WarfareLoreExpert);
         yield return masterWarfareLore;
-        Feat legendaryWarfareLore = new SkillIncreaseFeat(ModData.FeatNames.WarfareLoreLegendary, ModData.Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Master, ModData.FeatNames.WarfareLoreMaster);
+        Feat legendaryWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreLegendary, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Legendary, FeatNames.WarfareLoreMaster);
         yield return legendaryWarfareLore;
-        Feat additionalLoreWar = new TrueFeat(ModManager.RegisterFeatName("AdditionalLoreWF", "Additional Lore - Warfare"), 1, "Your knowledge has expanded to encompass a new field.", "You become trained in Warfare Lore. At 3rd level you become an expert in Warfare Lore, at 7th level you become a master in Warfare Lore, and at 15th level, you become legendary in Warfare Lore.", [Trait.General, Trait.Skill]);
+        Feat additionalLoreWar = new TrueFeat(FeatNames.AdditionalLoreWF, 1, "Your knowledge has expanded to encompass a new field.", "You become trained in Warfare Lore. At 3rd level you become an expert in Warfare Lore, at 7th level you become a master in Warfare Lore, and at 15th level, you become legendary in Warfare Lore.", [Trait.General, Trait.Skill]);
         CreateAdditionalLoreLogic(additionalLoreWar);
         yield return additionalLoreWar;
-        Feat battlePlanner = new TrueFeat(ModData.FeatNames.BattlePlanner, 2, "You are constantly drawing up plans and battle scenarios, assembling strategies and gathered intelligence for later use.", "If you or one of your allies has taken the scout exploration activity, you roll warfare lore instead of perception for initiative.", [Trait.General, Trait.Skill]);
+        Feat battlePlanner = new TrueFeat(FeatNames.BattlePlanner, 2, "You are constantly drawing up plans and battle scenarios, assembling strategies and gathered intelligence for later use.", "If you or one of your allies has taken the scout exploration activity, you roll warfare lore instead of perception for initiative.", [Trait.General, Trait.Skill]);
         CreateBattlePlannerLogic(battlePlanner);
         yield return battlePlanner;
         Feat cadet = new BackgroundSelectionFeat(ModManager.RegisterFeatName("Cadet", "Cadet"), "Once you enrolled in a military academy, where you studied tactics, strategy, the history of battles, and the art of command. Perhaps you lead others in battle yourself, or maybe you never had a chance. Either way, at some point you took the skills you learned and sought to apply them to a life of adventure.", "You are trained in {b}Athletics{/b}. You gain the {b}Additional Lore{/b} skill feat for {b}Warfare Lore{/b}.", [new LimitedAbilityBoost(Ability.Intelligence, Ability.Charisma), new FreeAbilityBoost()])
@@ -107,7 +109,7 @@ public abstract class ExplorationActivities
         cadet.Traits.Add(Trait.Homebrew);
         yield return cadet;
         Feat incredibleScout = new TrueFeat(ModManager.RegisterFeatName("IncredibleScout", "Incredible Scout"), 11, "When you scout, you are particularly alert for danger, granting your allies precious moments to prepare to fight.", "When using the Scout exploration activity, you grant your allies a +2 circumstance bonus to their initiative rolls instead of a +1 circumstance bonus.", [Trait.General])
-            .WithPrerequisite(values => values.GetProficiency(Trait.Perception) >= Proficiency.Master, "You must be a master in Perception.").WithPermanentQEffect(null, qf => qf.Id = ModData.QEffectIds.GreaterScoutActivity);
+            .WithPrerequisite(values => values.GetProficiency(Trait.Perception) >= Proficiency.Master, "You must be a master in Perception.").WithPermanentQEffect("When you scout, the bonus is +2 instead of +1.", qf => qf.Id = QEffectIds.GreaterScoutActivity);
         yield return incredibleScout;
         Feat pickUpThePace = new TrueFeat(ModManager.RegisterFeatName("PickUpThePace", "Pick up the Pace"), 3,
             "You lead by example and can help others push themselves beyond their normal limits.",
@@ -123,7 +125,7 @@ public abstract class ExplorationActivities
             {
                 qf.StartOfCombat = qff =>
                 {
-                    var bonus = qf.Owner.HasEffect(ModData.QEffectIds.GreaterScoutActivity)
+                    var bonus = qf.Owner.HasEffect(QEffectIds.GreaterScoutActivity)
                         ? 2
                         : 1;
                     qff.AddGrantingOfTechnical(cr => cr.FriendOf(qf.Owner), qfTech =>
@@ -142,11 +144,6 @@ public abstract class ExplorationActivities
         {
             Creature self = effect.Owner;
             effect.OfferAlternateSkillForInitiative = _ => Skill.Stealth;
-            int stealthMinusPerception = self.Skills.Get(Skill.Stealth) - self.Perception + (ModManager.TryParse("Suli", out Trait suli) && self.HasTrait(suli) ? 1 : 0);
-            if (stealthMinusPerception < 0)
-            {
-                effect.BonusToInitiative = _ => new Bonus(stealthMinusPerception, BonusType.Untyped, "Avoid Notice");
-            }
             effect.StartOfCombat = startOfCombat =>
             {
                 string coverText = string.Empty;
@@ -169,7 +166,7 @@ public abstract class ExplorationActivities
                 startOfCombat.Owner.Battle.Log(startOfCombat.Owner.Name + " has rolled Stealth for initiative" +
                                                coverText +
                                                (startOfCombat.Owner.DetectionStatus.EnemiesYouAreHiddenFrom.Any()
-                                                   ? "and is hidden to:\n" + string.Join(",",
+                                                   ? " and is hidden to:\n" + string.Join(", ",
                                                        startOfCombat.Owner.DetectionStatus.EnemiesYouAreHiddenFrom)
                                                    : "."));
                 return Task.CompletedTask;
@@ -366,7 +363,7 @@ public abstract class ExplorationActivities
     }
     private static void CreateImpersonateLogic(Feat impersonate)
     {
-        impersonate.WithPrerequisite(ModData.FeatNames.DeceptiveApproach, "Deceptive Approach")
+        impersonate.WithPrerequisite(FeatNames.DeceptiveApproach, "Deceptive Approach")
             .WithPermanentQEffect(null, effect =>
             {
                 effect.OfferAlternateSkillForInitiative = _ => Skill.Deception;
@@ -375,7 +372,7 @@ public abstract class ExplorationActivities
 
     private static void CreateMakeAnImpressionLogic(Feat makeAnImpression)
     {
-        makeAnImpression.WithPrerequisite(ModData.FeatNames.GladHand, "Glad-Hand")
+        makeAnImpression.WithPrerequisite(FeatNames.GladHand, "Glad-Hand")
             .WithPermanentQEffect( null, effect =>
                 {
                     effect.OfferAlternateSkillForInitiative = _ => Skill.Diplomacy;
@@ -384,7 +381,7 @@ public abstract class ExplorationActivities
     }
     private static void CreateCoerceLogic(Feat coerce)
     {
-        coerce.WithPrerequisite(ModData.FeatNames.ImposingPresence, "Imposing Presence")
+        coerce.WithPrerequisite(FeatNames.ImposingPresence, "Imposing Presence")
             .WithPermanentQEffect( null, effect =>
                 {
                     effect.OfferAlternateSkillForInitiative = _ => Skill.Intimidation;
@@ -396,28 +393,127 @@ public abstract class ExplorationActivities
     {
         additionalLore.WithOnSheet(values =>
         {
-            values.GrantFeat(ModData.FeatNames.WarfareLore);
-            values.AddAtLevel(3, v3 => v3.GrantFeat(ModData.FeatNames.WarfareLoreExpert));
-            values.AddAtLevel(7, v7 => v7.GrantFeat(ModData.FeatNames.WarfareLoreMaster));
-            values.AddAtLevel(15, v15 => v15.GrantFeat(ModData.FeatNames.WarfareLoreLegendary));
+            values.GrantFeat(FeatNames.WarfareLore);
+            values.AddAtLevel(3, v3 => v3.GrantFeat(FeatNames.WarfareLoreExpert));
+            values.AddAtLevel(7, v7 => v7.GrantFeat(FeatNames.WarfareLoreMaster));
+            values.AddAtLevel(15, v15 => v15.GrantFeat(FeatNames.WarfareLoreLegendary));
         });
     }
 
     private static void CreateBattlePlannerLogic(Feat battlePlanner)
     {
-        battlePlanner.WithPrerequisite(ModData.FeatNames.WarfareLoreExpert, "Expert in Warfare Lore")
-            .WithPermanentQEffect(null, effect =>
+        battlePlanner.WithPrerequisite(values => values.HasFeat(FeatNames.WarfareLoreExpert), "You must be expert in Warfare Lore.")
+            .WithPermanentQEffect("When the battle is scouted, you may use Warfare Lore for initiative.", effect =>
             {
-                effect.StartOfCombat = _ =>
+                effect.Description = ModManager.TryParse("FC_CommanderClass", out FeatName cmndr) && effect.Owner.HasFeat(cmndr) ? "When the battle is scouted, you reroll your initiative, taking the higher value." : effect.Description;
+                effect.StartOfCombat = async _ =>
                 {
                     Creature self = effect.Owner;
-                    if (self.Battle.AllCreatures.Where(cr => cr.FriendOf(self))
-                        .Any(creature => creature.HasFeat(ModData.FeatNames.ScoutActivity)))
+                    if (!self.Battle.AllCreatures.Where(cr => cr.FriendOf(self))
+                            .Any(creature => creature.HasFeat(FeatNames.ScoutActivity))) return;
+                    if (!ModManager.TryParse("FC_CommanderClass", out FeatName commander) || !self.HasFeat(commander) || self.Level < 3)
                         self.AddQEffect(new QEffect()
                         {
-                            OfferAlternateSkillForInitiative = _ => ModData.Skills.WarfareLore,
+                            OfferAlternateSkillForInitiative = _ => Skills.WarfareLore,
                         });
-                    return Task.CompletedTask;
+                    else
+                    {
+                        CombatAction initSwap = CombatAction.CreateSimple(self, "initSwap", Trait.DoNotShowInCombatLog, Trait.DoNotShowOverheadOfActionName, Trait.DoNotShowOverheadOfCheckResult, Trait.Basic).WithActionCost(0);
+                        initSwap.Target = Target.Self();
+                        initSwap.WithEffectOnEachTarget((_, _, _, _) =>
+                        {
+                            int roll = R.NextD20();
+                            CheckBreakdown breakdown = CombatActionExecution.BreakdownAttack(
+                                new CombatAction(self, null!, "reroll ini",
+                                        [
+                                            Trait.Basic, Trait.DoNotShowInCombatLog,
+                                            Trait.DoNotShowOverheadOfActionName,
+                                            Trait.DoNotShowOverheadOfCheckResult
+                                        ],
+                                        "", Target.Self())
+                                    .WithActiveRollSpecification(
+                                        new ActiveRollSpecification(TaggedChecks.SkillCheck(Skills.WarfareLore),
+                                            Checks.FlatDC(10))), self);
+                            CheckBreakdownResult result = new(breakdown, roll);
+                            Dictionary<BonusType, int> initBonuses = new();
+                            foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToInitiative != null))
+                            {
+                                int amount = qEffect.BonusToInitiative!.Invoke(qEffect)!.Amount;
+                                BonusType bonus = qEffect.BonusToInitiative!.Invoke(qEffect)!.BonusType;
+                                initBonuses.Add(bonus, amount);
+                            }
+                            Dictionary<BonusType, int> skillBonuses = new();
+                            foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToSkills?.Invoke(Skills.WarfareLore) != null))
+                            {
+                                int amount = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!.Amount;
+                                BonusType bonus = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!.BonusType;
+                                skillBonuses.Add(bonus, amount);
+                            }
+                            int maxStatus = 0;
+                            if (initBonuses.Any(pair => pair.Key == BonusType.Status) && skillBonuses.Any(pair => pair.Key == BonusType.Status))
+                            {
+                                maxStatus = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Status)
+                                    .MaxBy(pair => pair.Value).Value, skillBonuses
+                                    .Where(pair => pair.Key == BonusType.Status)
+                                    .MaxBy(pair => pair.Value).Value);
+                            }
+                            else if (initBonuses.Any(pair => pair.Key == BonusType.Status))
+                            {
+                                maxStatus = initBonuses.Where(pair => pair.Key == BonusType.Status)
+                                    .MaxBy(pair => pair.Value).Value;
+                            }
+                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Status))
+                            {
+                                maxStatus = skillBonuses.Where(pair => pair.Key == BonusType.Status).MaxBy(pair => pair.Value).Value;
+                            }
+                            int maxCircumstance = 0;
+                            if (initBonuses.Any(pair => pair.Key == BonusType.Circumstance) && skillBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            {
+                                maxCircumstance = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Circumstance)
+                                    .MaxBy(pair => pair.Value).Value, skillBonuses.Where(pair => pair.Key == BonusType.Circumstance)
+                                    .MaxBy(pair => pair.Value).Value);
+                            }
+                            else if (initBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            {
+                                maxCircumstance = initBonuses.Where(pair => pair.Key == BonusType.Circumstance)
+                                    .MaxBy(pair => pair.Value).Value;
+                            }
+                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            {
+                                maxCircumstance = skillBonuses.Where(pair => pair.Key == BonusType.Circumstance).MaxBy(pair => pair.Value).Value;
+                            }
+                            int maxItem = 0;
+                            if (initBonuses.Any(pair => pair.Key == BonusType.Item) && skillBonuses.Any(pair => pair.Key == BonusType.Item))
+                            {
+                                maxItem = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Item)
+                                    .MaxBy(pair => pair.Value).Value, skillBonuses
+                                    .Where(pair => pair.Key == BonusType.Item)
+                                    .MaxBy(pair => pair.Value).Value);
+                            }
+                            else if (initBonuses.Any(pair => pair.Key == BonusType.Item))
+                            {
+                                maxItem = initBonuses.Where(pair => pair.Key == BonusType.Item)
+                                    .MaxBy(pair => pair.Value).Value;
+                            }
+                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Item))
+                            {
+                                maxItem = skillBonuses.Where(pair => pair.Key == BonusType.Item).MaxBy(pair => pair.Value).Value;
+                            }
+                            int totalBonus = maxStatus + maxCircumstance + maxItem;
+                            int totalValue = result.TotalRollValue;
+                            if (totalBonus > result.Bonus)
+                                totalValue = totalBonus + result.D20Roll;
+                            // self.Battle.Log("Your initial initiative was: " + self.Initiative + "; Your reroll was: " +
+                            //                 totalValue);
+                            if (totalValue <= self.Initiative) return Task.CompletedTask;
+                            self.Initiative = totalValue;
+                            self.Battle.Log(
+                                "{Green}{b}Battle Planner{/b}{/Green} You rerolled your initiative and got a higher value!");
+                            self.RecalculateLandSpeedAndInitiative();
+                            return Task.CompletedTask;
+                        });
+                        await self.Battle.GameLoop.FullCast(initSwap);
+                    }
                 };
             });
     }
@@ -431,11 +527,11 @@ public abstract class ExplorationActivities
                 effect.StartOfCombat = _ =>
                 {
                     Creature self = effect.Owner;
-                    if (self.HasFeat(ModData.FeatNames.Hustle))
+                    if (self.HasFeat(FeatNames.Hustle))
                     {
                         effect.AddGrantingOfTechnical(cr => cr.FriendOfAndNotSelf(self), qfTech =>
                         {
-                            if (!qfTech.Owner.HasFeat(ModData.FeatNames.Hustle))
+                            if (!qfTech.Owner.HasFeat(FeatNames.Hustle))
                                 qfTech.Owner.AddQEffect(new QEffect(ExpirationCondition.ExpiresAtEndOfYourTurn)
                                 {
                                     BonusToAllSpeeds = _ => new Bonus(self.Abilities.Constitution >= 4 ? 2 : 1, BonusType.Circumstance, "Hustle")

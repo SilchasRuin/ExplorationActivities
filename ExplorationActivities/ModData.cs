@@ -20,6 +20,7 @@ public abstract class ModData
         public static readonly FeatName WarfareLoreLegendary = ModManager.RegisterFeatName("WarfareLoreLegendary", "Legendary in Warfare Lore");
         public static readonly FeatName BattlePlanner =  ModManager.RegisterFeatName("BattlePlanner", "Battle Planner");
         public static readonly FeatName Hustle = ModManager.RegisterFeatName("Hustle");
+        public static readonly FeatName AdditionalLoreWF = ModManager.RegisterFeatName("AdditionalLoreWF", "Additional Lore - Warfare");
     }
 
     public static class Traits
