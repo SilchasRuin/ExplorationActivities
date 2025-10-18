@@ -1,4 +1,5 @@
-﻿using Dawnsbury.Auxiliary;
+﻿using System.Reflection;
+using Dawnsbury.Auxiliary;
 using Dawnsbury.Core;
 using Dawnsbury.Core.CharacterBuilder.AbilityScores;
 using Dawnsbury.Core.CharacterBuilder.Feats;
@@ -14,7 +15,6 @@ using Dawnsbury.Core.Mechanics.Targeting;
 using Dawnsbury.Core.Possibilities;
 using Dawnsbury.Core.Tiles;
 using Dawnsbury.Modding;
-using Dawnsbury.Mods.DawnniExpanded;
 using static ExplorationActivities.ModData;
 
 namespace ExplorationActivities;
@@ -55,7 +55,7 @@ public abstract class ExplorationActivities
         {
             Feat investigate = new(ModManager.RegisterFeatName("Investigate"), "You seek out information about the enemies you could face.", "If an enemy is within range at the start of an encounter, you may Recall Weakness as a free action. If you are a strategist, the target of your Recall Weakness is marked as a person of interest (this does not count against the number of times you may declare a person of interest).",
                 [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
-            CreateInvestigateLogic(investigate);
+            DawnniRequired.CreateInvestigateLogic(investigate);
             yield return investigate;
         }
         Feat track = new(ModManager.RegisterFeatName("Track"), "You follow tracks and look for signs of enemies.", "You roll survival instead of perception for initiative. If you are a Ranger, at the start of an encounter, you may Hunt Prey as a free action on one creature who acts after you in initiative.",
@@ -213,10 +213,10 @@ public abstract class ExplorationActivities
     {
         shieldCast.WithPermanentQEffect(null, effect =>
         {
-            Creature self = effect.Owner;
+            Creature caster = effect.Owner;
             effect.StartOfCombat = async _ =>
             {
-                Possibilities shield = Possibilities.Create(self).Filter(ap =>
+                Possibilities shield = Possibilities.Create(caster).Filter(ap =>
                 {
                     if (ap.CombatAction.SpellId != SpellId.Shield)
                         return false;
@@ -226,8 +226,16 @@ public abstract class ExplorationActivities
                     ap.RecalculateUsability();
                     return true;
                 });
-                List<Option> actions = await self.Battle.GameLoop.CreateActions(self, shield, null);
-                await self.Battle.GameLoop.OfferOptions(self, actions, true);
+                Creature? original = caster.Battle.ActiveCreature;
+                caster.Battle.ActiveCreature = caster;
+                typeof(Creature).InvokeMember("Possibilities",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.SetProperty | BindingFlags.Instance,
+                        null, caster,
+                        [shield]);
+                List<Option> options = await caster.Battle.GameLoop.CreateActions(caster, caster.Possibilities, null);
+                caster.Battle.GameLoopCallback.AfterActiveCreaturePossibilitiesRegenerated();
+                await caster.Battle.GameLoop.OfferOptions(caster, options, true);
+                caster.Battle.ActiveCreature = original;
             };
         })
         .WithPrerequisite(values => values.Sheet.PreparedSpells.Any(pair => pair.Value is { SpellId: SpellId.Shield }) || values.SpellRepertoires.Any(pair => pair.Value.SpellsKnown.Any(spell => spell.SpellId == SpellId.Shield)) || values.InnateSpells.Any(pair => pair.Value.SpellsKnown.Any(spell => spell.SpellId == SpellId.Shield)), "You must be able to cast shield.");
@@ -271,52 +279,6 @@ public abstract class ExplorationActivities
             .WithPrerequisite(values => values.Sheet.PreparedSpells.Any(pair => pair.Value is { } spell && spell.SpellId == ExplorationSpells.GlassShield) || values.SpellRepertoires.Any(pair => pair.Value.SpellsKnown.Any(spell => spell.SpellId == ExplorationSpells.GlassShield)) || values.InnateSpells.Any(pair => pair.Value.SpellsKnown.Any(spell => spell.SpellId == ExplorationSpells.GlassShield)), "You must be able to cast glass shield.");
     }
 
-    private static void CreateInvestigateLogic(Feat investigate)
-    {
-        investigate.WithPermanentQEffect(null, effect =>
-        {
-            Feat glance = FeatRecallWeakness.SlightestGlanceWeakness;
-            Creature self = effect.Owner;
-            effect.StartOfCombat = async _ =>
-            {
-                if (Possibilities.Create(self).Filter(ap =>
-                    {
-                        if (!ap.CombatAction.Name.Contains("Recall Weakness"))
-                            return false;
-                        ap.CombatAction.ActionCost = 0;
-                        ap.RecalculateUsability();
-                        return true;
-                    }).CreateActions(true).FirstOrDefault(pw => pw.Action.Name.Contains("Recall Weakness")) is CombatAction investigateAction)
-                {
-                    if (self.Battle.AllCreatures.Any(cr => cr.EnemyOf(self) && cr.DistanceTo(self) <= (self.HasFeat(glance.FeatName) && self.Proficiencies.Get(Trait.Perception) >= Proficiency.Master ? 24 : self.HasFeat(glance.FeatName) ? 12 : 6)))
-                    {
-                        if (self.PersistentCharacterSheet is { Class.ClassTrait: Trait.Investigator })
-                        {
-                            self.AddQEffect(new QEffect(ExpirationCondition.ExpiresAtStartOfYourTurn)
-                            {
-                                AfterYouTakeActionAgainstTarget = (_, action, _, _) =>
-                                {
-                                    if (action.Name.Contains("Recall Weakness"))
-                                    {
-                                        action.ChosenTargets.ChosenCreature?.AddQEffect(
-                                            new QEffect("Person of Interest ",
-                                                self.Name + " can declare a stratagem against this creature for free.",
-                                                ExpirationCondition.Never, self, IllustrationName.HuntPrey)
-                                            {
-                                                Id = QEffectId.IsPersonOfInterest
-                                            });
-                                    }
-
-                                    return Task.CompletedTask;
-                                }
-                            });
-                        }
-                        await self.Battle.GameLoop.FullCast(investigateAction);
-                    }
-                }
-            };
-        });
-    }
     private static void CreateTrackLogic(Feat track)
     { 
         track.WithPrerequisite(sheet => sheet.GetProficiency(Trait.Survival) >= Proficiency.Trained, "You must be trained in Survival.")
@@ -411,7 +373,7 @@ public abstract class ExplorationActivities
                     Creature self = effect.Owner;
                     if (!self.Battle.AllCreatures.Where(cr => cr.FriendOf(self))
                             .Any(creature => creature.HasFeat(FeatNames.ScoutActivity))) return;
-                    if (!ModManager.TryParse("FC_CommanderClass", out FeatName commander) || !self.HasFeat(commander) || self.Level < 3)
+                    if (!ModManager.TryParse("FC_CommanderClass", out FeatName commander) || !self.HasFeat(commander) || self.Level < 3 || !self.Battle.AllCreatures.Any(enemy => enemy.EnemyOf(self) && self.CanSee(enemy)))
                         self.AddQEffect(new QEffect()
                         {
                             OfferAlternateSkillForInitiative = _ => Skills.WarfareLore,
@@ -435,71 +397,89 @@ public abstract class ExplorationActivities
                                         new ActiveRollSpecification(TaggedChecks.SkillCheck(Skills.WarfareLore),
                                             Checks.FlatDC(10))), self);
                             CheckBreakdownResult result = new(breakdown, roll);
-                            Dictionary<BonusType, int> initBonuses = new();
+                            List<Bonus> initiativeBonuses = [];
                             foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToInitiative != null))
                             {
-                                int amount = qEffect.BonusToInitiative!.Invoke(qEffect)!.Amount;
-                                BonusType bonus = qEffect.BonusToInitiative!.Invoke(qEffect)!.BonusType;
-                                initBonuses.Add(bonus, amount);
+                                Bonus bonus = qEffect.BonusToInitiative!.Invoke(qEffect)!;
+                                initiativeBonuses.Add(bonus);
                             }
-                            Dictionary<BonusType, int> skillBonuses = new();
+                            List<Bonus> skillBonuses = [];
                             foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToSkills?.Invoke(Skills.WarfareLore) != null))
                             {
-                                int amount = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!.Amount;
-                                BonusType bonus = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!.BonusType;
-                                skillBonuses.Add(bonus, amount);
+                                Bonus bonus = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!;
+                                skillBonuses.Add(bonus);
                             }
                             int maxStatus = 0;
-                            if (initBonuses.Any(pair => pair.Key == BonusType.Status) && skillBonuses.Any(pair => pair.Key == BonusType.Status))
+                            if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Status) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Status))
                             {
-                                maxStatus = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Status)
-                                    .MaxBy(pair => pair.Value).Value, skillBonuses
-                                    .Where(pair => pair.Key == BonusType.Status)
-                                    .MaxBy(pair => pair.Value).Value);
+                                maxStatus = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Status)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount, skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Status)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount);
                             }
-                            else if (initBonuses.Any(pair => pair.Key == BonusType.Status))
+                            else if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Status))
                             {
-                                maxStatus = initBonuses.Where(pair => pair.Key == BonusType.Status)
-                                    .MaxBy(pair => pair.Value).Value;
+                                maxStatus = initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Status)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Status))
+                            else if (skillBonuses.Any(bonus => bonus.BonusType == BonusType.Status))
                             {
-                                maxStatus = skillBonuses.Where(pair => pair.Key == BonusType.Status).MaxBy(pair => pair.Value).Value;
+                                maxStatus = skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Status)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
                             int maxCircumstance = 0;
-                            if (initBonuses.Any(pair => pair.Key == BonusType.Circumstance) && skillBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Circumstance) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Circumstance))
                             {
-                                maxCircumstance = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Circumstance)
-                                    .MaxBy(pair => pair.Value).Value, skillBonuses.Where(pair => pair.Key == BonusType.Circumstance)
-                                    .MaxBy(pair => pair.Value).Value);
+                                maxCircumstance = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Circumstance)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount, skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Status)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount);
                             }
-                            else if (initBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            else if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Circumstance))
                             {
-                                maxCircumstance = initBonuses.Where(pair => pair.Key == BonusType.Circumstance)
-                                    .MaxBy(pair => pair.Value).Value;
+                                maxCircumstance = initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Circumstance)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Circumstance))
+                            else if (skillBonuses.Any(bonus => bonus.BonusType == BonusType.Circumstance))
                             {
-                                maxCircumstance = skillBonuses.Where(pair => pair.Key == BonusType.Circumstance).MaxBy(pair => pair.Value).Value;
+                                maxCircumstance = skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Circumstance)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
                             int maxItem = 0;
-                            if (initBonuses.Any(pair => pair.Key == BonusType.Item) && skillBonuses.Any(pair => pair.Key == BonusType.Item))
+                            if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Item) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Item))
                             {
-                                maxItem = Math.Max(initBonuses.Where(pair => pair.Key == BonusType.Item)
-                                    .MaxBy(pair => pair.Value).Value, skillBonuses
-                                    .Where(pair => pair.Key == BonusType.Item)
-                                    .MaxBy(pair => pair.Value).Value);
+                                maxItem = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Item)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount, skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Item)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount);
                             }
-                            else if (initBonuses.Any(pair => pair.Key == BonusType.Item))
+                            else if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Item))
                             {
-                                maxItem = initBonuses.Where(pair => pair.Key == BonusType.Item)
-                                    .MaxBy(pair => pair.Value).Value;
+                                maxItem = initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Item)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            else if (skillBonuses.Any(pair => pair.Key == BonusType.Item))
+                            else if (skillBonuses.Any(bonus => bonus.BonusType == BonusType.Item))
                             {
-                                maxItem = skillBonuses.Where(pair => pair.Key == BonusType.Item).MaxBy(pair => pair.Value).Value;
+                                maxItem = skillBonuses
+                                    .Where(bonus => bonus.BonusType == BonusType.Item)
+                                    .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            int totalBonus = maxStatus + maxCircumstance + maxItem;
+                            int untyped = 0;
+                            if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped))
+                            {
+                                untyped = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount), skillBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount));
+                            }
+                            else if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped))
+                            {
+                                untyped = initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount);
+                            }
+                            else if (skillBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped))
+                            {
+                                untyped =  skillBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount);
+                            }
+                            int totalBonus = maxStatus + maxCircumstance + maxItem + untyped;
                             int totalValue = result.TotalRollValue;
                             if (totalBonus > result.Bonus)
                                 totalValue = totalBonus + result.D20Roll;

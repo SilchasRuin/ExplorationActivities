@@ -1,0 +1,48 @@
+﻿using System.Reflection;
+using Dawnsbury.Core.Possibilities;
+
+namespace ExplorationActivities;
+
+public class NewTasks
+{
+    
+    public static Possibilities Filter(Possibilities possibilities0, Func<Possibility, bool> keepOnlyWhat)
+    {
+        Possibilities possibilities = possibilities0.Filter(_ => false);
+        foreach (PossibilitySection section in possibilities0.Sections)
+        {
+            PossibilitySection? possibilitySection = Filter(keepOnlyWhat, section);
+            if (possibilitySection != null)
+                possibilities.Sections.Add(possibilitySection);
+        }
+        return possibilities;
+    }
+    public static PossibilitySection? Filter(Func<Possibility, bool> keepOnlyWhat, PossibilitySection possibilitySectionO)
+    {
+        PossibilitySection possibilitySection = new(possibilitySectionO.Name);
+        foreach (Possibility possibility in possibilitySectionO.Possibilities)
+        {
+            if (possibility is SubmenuPossibility submenuPossibility1)
+            {
+                SubmenuPossibility? submenuPossibility = Filter(keepOnlyWhat, submenuPossibility1);
+                if (submenuPossibility != null)
+                    possibilitySection.Possibilities.Add(submenuPossibility);
+            }
+            else if (keepOnlyWhat(possibility))
+                possibilitySection.Possibilities.Add(possibility);
+        }
+        return possibilitySection.Possibilities.Count == 0 ? null : possibilitySection;
+    }
+    
+    public static SubmenuPossibility? Filter(Func<Possibility, bool> keepOnlyWhat, SubmenuPossibility possibility)
+    {
+        SubmenuPossibility submenuPossibility = new(possibility.Illustration, possibility.Caption, possibility.PossibilitySize);
+        foreach (PossibilitySection subsection in possibility.Subsections)
+        {
+            PossibilitySection? possibilitySection = Filter(keepOnlyWhat, subsection);
+            if (possibilitySection != null)
+                submenuPossibility.Subsections.Add(possibilitySection);
+        }
+        return submenuPossibility.Subsections.Count != 0 ? submenuPossibility : null;
+    }
+}
