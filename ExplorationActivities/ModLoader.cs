@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using Dawnsbury.Core.CharacterBuilder.Feats;
+using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CharacterBuilder.Selections.Options;
 using Dawnsbury.Core.Creatures;
 using Dawnsbury.Core.Creatures.Parts;
@@ -66,13 +67,17 @@ public class ModLoader
         });
         if (ModManager.TryParse("Fount of Knowledge", out FeatName fountOfKnowledge))
         {
-            ModManager.RegisterActionOnEachCreature(cr =>
+            // ModManager.RegisterActionOnEachCreature(cr =>
+            // {
+            //     if (cr.HasFeat(fountOfKnowledge))
+            //         cr.AddQEffect(new QEffect()
+            //         {
+            //             BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
+            //         });
+            // });
+            AllFeats.GetFeatByFeatName(fountOfKnowledge).OnCreature += (_, cr) => cr.AddQEffect(new QEffect 
             {
-                if (cr.HasFeat(fountOfKnowledge))
-                    cr.AddQEffect(new QEffect()
-                    {
-                        BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
-                    });
+                BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
             });
         }
     }

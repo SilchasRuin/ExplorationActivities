@@ -133,7 +133,8 @@ public abstract class ExplorationActivities
                         qfTech.BonusToInitiative = _ =>
                             new Bonus(bonus, BonusType.Circumstance, "Scout Activity");
                     });
-                    qf.Owner.Battle.Log("You scouted the area, you and all allies gain a +"+bonus+" circumstance bonus to initiative.");
+                    qf.Owner.Battle.Log(
+                        $"{qf.Owner.Name} scouted the area, {qf.Owner.Name} and all allies gain a +{bonus} circumstance bonus to initiative.");
                     return Task.CompletedTask;
                 };
             });

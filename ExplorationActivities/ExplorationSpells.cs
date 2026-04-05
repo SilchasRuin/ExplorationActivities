@@ -108,7 +108,7 @@ public abstract class ExplorationSpells
                                         return null;
                                     if (attacker.DistanceTo(caster) <= 1)
                                     {
-                                        CheckResult checkResult = CommonSpellEffects.RollSpellSavingThrow(attacker, spell, Defense.Reflex);
+                                        CheckResult checkResult = await CommonSpellEffects.RollSpellSavingThrowAsync(attacker, spell, Defense.Reflex);
                                         await CommonSpellEffects.DealBasicDamage(spell, caster, attacker, checkResult, DiceFormula.FromText(diceFormula), DamageKind.Piercing);
                                     }
                                     spell.SpellcastingSource?.Cantrips.RemoveAll(
