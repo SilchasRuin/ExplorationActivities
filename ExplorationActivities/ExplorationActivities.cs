@@ -3,6 +3,7 @@ using Dawnsbury.Auxiliary;
 using Dawnsbury.Core;
 using Dawnsbury.Core.CharacterBuilder.AbilityScores;
 using Dawnsbury.Core.CharacterBuilder.Feats;
+using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CharacterBuilder.Spellcasting;
 using Dawnsbury.Core.CombatActions;
 using Dawnsbury.Core.Coroutines.Options;
@@ -51,7 +52,7 @@ public abstract class ExplorationActivities
             [ModData.Traits.ExplorationActivity, Trait.Concentrate], null);
         CreateCastGlassLogic(castGlass);
         yield return castGlass;
-        if (ModManager.TryParse("DawnniEx", out Trait _))
+        if (ModManager.TryParse("DawnniEx", out Trait _) || ModManager.TryParse("RecallWeaknessActionID", out ActionId _))
         {
             Feat investigate = new(ModManager.RegisterFeatName("Investigate"), "You seek out information about the enemies you could face.", "If an enemy is within range at the start of an encounter, you may Recall Weakness as a free action. If you are a strategist, the target of your Recall Weakness is marked as a person of interest (this does not count against the number of times you may declare a person of interest).",
                 [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
@@ -86,24 +87,41 @@ public abstract class ExplorationActivities
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateCoerceLogic(coerce);
         yield return coerce;
-        Feat warfareLore = new SkillSelectionFeat(FeatNames.WarfareLore, Skills.WarfareLore, ModData.Traits.WarfareLore);
-        yield return warfareLore;
-        Feat expertWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreExpert, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Expert, FeatNames.WarfareLore);
-        yield return expertWarfareLore;
-        Feat masterWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreMaster, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Master, FeatNames.WarfareLoreExpert);
-        yield return masterWarfareLore;
-        Feat legendaryWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreLegendary, Skills.WarfareLore,ModData.Traits.WarfareLore, Proficiency.Legendary, FeatNames.WarfareLoreMaster);
-        yield return legendaryWarfareLore;
-        Feat additionalLoreWar = new TrueFeat(FeatNames.AdditionalLoreWF, 1, "Your knowledge has expanded to encompass a new field.", "You become trained in Warfare Lore. At 3rd level you become an expert in Warfare Lore, at 7th level you become a master in Warfare Lore, and at 15th level, you become legendary in Warfare Lore.", [Trait.General, Trait.Skill]);
-        CreateAdditionalLoreLogic(additionalLoreWar);
-        yield return additionalLoreWar;
+        if (!ModManager.TryParse("LoresAndWeaknesses.Lore", out Trait _))
+        {
+            Feat warfareLore =
+                new SkillSelectionFeat(FeatNames.WarfareLore, Skills.WarfareLore, ModData.Traits.WarfareLore);
+            yield return warfareLore;
+            Feat expertWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreExpert, Skills.WarfareLore,
+                ModData.Traits.WarfareLore, Proficiency.Expert, FeatNames.WarfareLore);
+            yield return expertWarfareLore;
+            Feat masterWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreMaster, Skills.WarfareLore,
+                ModData.Traits.WarfareLore, Proficiency.Master, FeatNames.WarfareLoreExpert);
+            yield return masterWarfareLore;
+            Feat legendaryWarfareLore = new SkillIncreaseFeat(FeatNames.WarfareLoreLegendary, Skills.WarfareLore,
+                ModData.Traits.WarfareLore, Proficiency.Legendary, FeatNames.WarfareLoreMaster);
+            yield return legendaryWarfareLore;
+        }
+        Feat? additionalLoreWar = ModManager.TryParse("LoresAndWeaknesses.Lore", out Trait _) ? null : new TrueFeat(FeatNames.AdditionalLoreWF, 1, "Your knowledge has expanded to encompass a new field.", "You become trained in Warfare Lore. At 3rd level you become an expert in Warfare Lore, at 7th level you become a master in Warfare Lore, and at 15th level, you become legendary in Warfare Lore.", [Trait.General, Trait.Skill]);
+        if (additionalLoreWar != null)
+        {
+            CreateAdditionalLoreLogic(additionalLoreWar);
+            yield return additionalLoreWar;
+        }
         Feat battlePlanner = new TrueFeat(FeatNames.BattlePlanner, 2, "You are constantly drawing up plans and battle scenarios, assembling strategies and gathered intelligence for later use.", "If you or one of your allies has taken the scout exploration activity, you roll warfare lore instead of perception for initiative.", [Trait.General, Trait.Skill]);
         CreateBattlePlannerLogic(battlePlanner);
         yield return battlePlanner;
         Feat cadet = new BackgroundSelectionFeat(ModManager.RegisterFeatName("Cadet", "Cadet"), "Once you enrolled in a military academy, where you studied tactics, strategy, the history of battles, and the art of command. Perhaps you lead others in battle yourself, or maybe you never had a chance. Either way, at some point you took the skills you learned and sought to apply them to a life of adventure.", "You are trained in {b}Athletics{/b}. You gain the {b}Additional Lore{/b} skill feat for {b}Warfare Lore{/b}.", [new LimitedAbilityBoost(Ability.Intelligence, Ability.Charisma), new FreeAbilityBoost()])
             .WithOnSheet(values =>
             {
-                values.GrantFeat(additionalLoreWar.FeatName);
+                if (additionalLoreWar != null)
+                {
+                    values.GrantFeat(additionalLoreWar.FeatName);
+                }
+                else if (ModManager.TryParse("LoresAndWeaknesses.AdditionalLore.Warfare Lore", out FeatName addWar))
+                {
+                    values.GrantFeat(addWar);
+                }
                 values.TrainInThisOrSubstitute(Skill.Athletics);
             });
         cadet.Traits.Add(Trait.Homebrew);

@@ -18,19 +18,23 @@ public class ModLoader
     public static void LoadMod()
     {
         var harmony = new Harmony("explorationactivities");
-        harmony.PatchAll();
-        Type skills = typeof(Skills);
-        var myObject = new Skills();
-        FieldInfo? field = skills.GetField("relevantAbility", BindingFlags.Static | BindingFlags.NonPublic);
-        if (field != null)
+        if (!ModManager.TryParse("WarfareLore", out Skill _))
         {
-            var dict = field.GetValue(myObject) as IDictionary<Skill, Ability>;
-            if (dict == null)
+            harmony.PatchAll();
+            Type skills = typeof(Skills);
+            var myObject = new Skills();
+            FieldInfo? field = skills.GetField("relevantAbility", BindingFlags.Static | BindingFlags.NonPublic);
+            if (field != null)
             {
-                dict = new Dictionary<Skill, Ability>();
-                field.SetValue(myObject, dict);
+                var dict = field.GetValue(myObject) as IDictionary<Skill, Ability>;
+                if (dict == null)
+                {
+                    dict = new Dictionary<Skill, Ability>();
+                    field.SetValue(myObject, dict);
+                }
+
+                dict[ModData.Skills.WarfareLore] = Ability.Intelligence;
             }
-            dict[ModData.Skills.WarfareLore] = Ability.Intelligence;
         }
         foreach (Feat feat in ExplorationActivities.ExplorationFeats())
         {
@@ -48,7 +52,7 @@ public class ModLoader
         ExplorationSpells.RegisterSpells();
         ModManager.RegisterActionOnEachCreature(cr =>
         {
-            if (cr.HasFeat(ModData.FeatNames.WarfareLore))
+            if (!ModManager.TryParse("LoresAndWeaknesses.AdditionalLore.Warfare Lore", out FeatName _) && cr.HasFeat(ModData.FeatNames.WarfareLore))
                 cr.AddQEffect(new QEffect()
                 {
                     YouBeginAction = (effect, action) =>

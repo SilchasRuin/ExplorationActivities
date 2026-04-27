@@ -1,11 +1,11 @@
 ﻿using Dawnsbury.Core;
 using Dawnsbury.Core.CharacterBuilder.Feats;
+using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CombatActions;
 using Dawnsbury.Core.Creatures;
 using Dawnsbury.Core.Mechanics;
 using Dawnsbury.Core.Mechanics.Enumerations;
 using Dawnsbury.Core.Possibilities;
-using Dawnsbury.Mods.DawnniExpanded;
 
 namespace ExplorationActivities;
 
@@ -15,7 +15,7 @@ public class DawnniRequired
     {
         investigate.WithPermanentQEffect(null, effect =>
         {
-            Feat glance = FeatRecallWeakness.SlightestGlanceWeakness;
+            Feat glance = AllFeats.All.FirstOrDefault(f => f.Name.Contains("Slightest Glance Weakness"))!;
             Creature self = effect.Owner;
             effect.StartOfCombat = async _ =>
             {
