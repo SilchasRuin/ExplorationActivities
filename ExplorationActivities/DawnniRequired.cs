@@ -2,9 +2,11 @@
 using Dawnsbury.Core.CharacterBuilder.Feats;
 using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CombatActions;
+using Dawnsbury.Core.Coroutines.Options.Reactive;
 using Dawnsbury.Core.Creatures;
 using Dawnsbury.Core.Mechanics;
 using Dawnsbury.Core.Mechanics.Enumerations;
+using Dawnsbury.Core.Mechanics.Targeting.Targets;
 using Dawnsbury.Core.Possibilities;
 
 namespace ExplorationActivities;
@@ -15,26 +17,30 @@ public class DawnniRequired
     {
         investigate.WithPermanentQEffect(null, effect =>
         {
-            Feat glance = AllFeats.All.FirstOrDefault(f => f.Name.Contains("Slightest Glance Weakness"))!;
             Creature self = effect.Owner;
-            effect.StartOfCombat = async _ =>
+            effect.StartOfCombatReaction = _ =>
             {
                 if (Possibilities.Create(self).Filter(ap =>
+                        {
+                            if (!ap.CombatAction.Name.Contains("Recall Weakness"))
+                                return false;
+                            ap.CombatAction.ActionCost = 0;
+                            ap.RecalculateUsability();
+                            return true;
+                        }).CreateActions(true)
+                        .FirstOrDefault(pw => pw.Action.Name.Contains("Recall Weakness")) is not CombatAction
+                    investigateAction) return null;
+                if (investigateAction.Target is not CreatureTarget investigateTarget ||
+                    !self.Battle.AllCreatures.Any(cr => investigateTarget.IsLegalTarget(self, cr))) return null;
+                bool isInvestigator = self.PersistentCharacterSheet is { Class.ClassTrait: Trait.Investigator };
+                return ReactionOption.CreateFromCombatActionCustom(investigateAction, "Recall weakness on a creature within range." +
+                    (isInvestigator ? " The creature you recall weakness on becomes a person of interest." : ""), async () =>
                     {
-                        if (!ap.CombatAction.Name.Contains("Recall Weakness"))
-                            return false;
-                        ap.CombatAction.ActionCost = 0;
-                        ap.RecalculateUsability();
-                        return true;
-                    }).CreateActions(true).FirstOrDefault(pw => pw.Action.Name.Contains("Recall Weakness")) is CombatAction investigateAction)
-                {
-                    if (self.Battle.AllCreatures.Any(cr => cr.EnemyOf(self) && cr.DistanceTo(self) <= (self.HasFeat(glance.FeatName) && self.Proficiencies.Get(Trait.Perception) >= Proficiency.Master ? 24 : self.HasFeat(glance.FeatName) ? 12 : 6)))
-                    {
-                        if (self.PersistentCharacterSheet is { Class.ClassTrait: Trait.Investigator })
+                        if (isInvestigator)
                         {
                             self.AddQEffect(new QEffect(ExpirationCondition.ExpiresAtStartOfYourTurn)
                             {
-                                AfterYouTakeActionAgainstTarget = (_, action, _, _) =>
+                                AfterYouTakeActionAgainstTarget = async (_, action, _, _) =>
                                 {
                                     if (action.Name.Contains("Recall Weakness"))
                                     {
@@ -46,14 +52,11 @@ public class DawnniRequired
                                                 Id = QEffectId.IsPersonOfInterest
                                             });
                                     }
-
-                                    return Task.CompletedTask;
                                 }
                             });
                         }
                         await self.Battle.GameLoop.FullCast(investigateAction);
-                    }
-                }
+                    });
             };
         });
     }

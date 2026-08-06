@@ -21,6 +21,7 @@ public abstract class ModData
         public static readonly FeatName WarfareLoreMaster = ModManager.TryParse("MasterWarfare Lore", out FeatName wLore) ? wLore : ModManager.RegisterFeatName("MasterWarfare Lore", "Master in Warfare Lore");
         public static readonly FeatName WarfareLoreLegendary = ModManager.TryParse("LegendaryWarfare Lore", out FeatName wLore) ? wLore : ModManager.RegisterFeatName("LegendaryWarfare Lore", "Legendary in Warfare Lore");
         public static readonly FeatName AdditionalLoreWF = ModManager.TryParse("LoresAndWeaknesses.AdditionalLore.Warfare Lore", out FeatName wLore) ? wLore : ModManager.RegisterFeatName("LoresAndWeaknesses.AdditionalLore.Warfare Lore", "Additional Lore - Warfare");
+        public static readonly FeatName Track = ModManager.RegisterFeatName("Track");
     }
 
     public static class Traits
@@ -36,6 +37,10 @@ public abstract class ModData
         internal static QEffectId GlassShieldEffect { get; } = ModManager.RegisterEnumMember<QEffectId>("GlassShieldEffect");
         internal static QEffectId MusicalAccompanimentQf { get; } = ModManager.RegisterEnumMember<QEffectId>("MusicalAccompanimentQf");
         public static QEffectId GreaterScoutActivity { get; } = ModManager.TryParse("GreaterScoutActivity", out QEffectId greaterScout) ? greaterScout : ModManager.RegisterEnumMember<QEffectId>("GreaterScoutActivity");
+        public static QEffectId Track { get; } =  ModManager.RegisterEnumMember<QEffectId>("EA_Track");
+        public static QEffectId Scouting { get; } = ModManager.RegisterEnumMember<QEffectId>("EA_Scouting");
+        public static QEffectId Hustle { get; } = ModManager.RegisterEnumMember<QEffectId>("EA_Hustle");
+        
     }
 
     public static class Skills

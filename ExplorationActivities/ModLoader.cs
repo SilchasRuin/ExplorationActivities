@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using Dawnsbury.Auxiliary;
 using Dawnsbury.Core.CharacterBuilder.Feats;
 using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CharacterBuilder.Selections.Options;
@@ -22,17 +23,15 @@ public class ModLoader
         {
             harmony.PatchAll();
             Type skills = typeof(Skills);
-            var myObject = new Skills();
+            Skills myObject = new();
             FieldInfo? field = skills.GetField("relevantAbility", BindingFlags.Static | BindingFlags.NonPublic);
             if (field != null)
             {
-                var dict = field.GetValue(myObject) as IDictionary<Skill, Ability>;
-                if (dict == null)
+                if (field.GetValue(myObject) is not IDictionary<Skill, Ability> dict)
                 {
                     dict = new Dictionary<Skill, Ability>();
                     field.SetValue(myObject, dict);
                 }
-
                 dict[ModData.Skills.WarfareLore] = Ability.Intelligence;
             }
         }
@@ -55,33 +54,24 @@ public class ModLoader
             if (!ModManager.TryParse("LoresAndWeaknesses.AdditionalLore.Warfare Lore", out FeatName _) && cr.HasFeat(ModData.FeatNames.WarfareLore))
                 cr.AddQEffect(new QEffect()
                 {
-                    YouBeginAction = (effect, action) =>
+                    YouBeginAction = async (effect, action) =>
                     {
                         Creature self = effect.Owner;
                         Creature? target = action.ChosenTargets.ChosenCreature;
-                        var warfareMinusSociety = self.Skills.Get(ModData.Skills.WarfareLore) - self.Skills.Get(Skill.Society);
+                        int warfareMinusSociety = self.Skills.Get(ModData.Skills.WarfareLore) - self.Skills.Get(Skill.Society);
                         if (target != null && action is { Name: "Recall Weakness" } && warfareMinusSociety > 0
                             && (target.Traits.Contains(Trait.Human) || target.Traits.Contains(Trait.Humanoid) || target.Traits.Contains(Trait.Orc) || target.Traits.Contains(Trait.Kobold) || target.Traits.Contains(Trait.Merfolk)))
                             action.WithActiveRollSpecification(new ActiveRollSpecification(
                                 TaggedChecks.SkillCheck(ModData.Skills.WarfareLore),
                                 Checks.FlatDC(Checks.LevelBasedDC(target.Level))));
-                        return Task.CompletedTask;
                     }
                 });
         });
-        if (ModManager.TryParse("Fount of Knowledge", out FeatName fountOfKnowledge))
+        if (ModManager.TryParse("Fount of Knowledge", out FeatName fountOfKnowledge) && AllFeats.All.FirstOrDefault(ft => ft.FeatName == fountOfKnowledge) is {} fount)
         {
-            // ModManager.RegisterActionOnEachCreature(cr =>
-            // {
-            //     if (cr.HasFeat(fountOfKnowledge))
-            //         cr.AddQEffect(new QEffect()
-            //         {
-            //             BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
-            //         });
-            // });
-            AllFeats.GetFeatByFeatName(fountOfKnowledge).OnCreature += (_, cr) => cr.AddQEffect(new QEffect 
+            fount.OnCreature += (_, cr) => cr.AddQEffect(new QEffect 
             {
-                BonusToSkills = skill => skill == ModData.Skills.WarfareLore ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
+                BonusToSkills = skill => skill.ToStringOrTechnical().ContainsIgnoreCase("Lore") ? new Bonus(1, BonusType.Status, "Fount of Knowledge") : null
             });
         }
     }

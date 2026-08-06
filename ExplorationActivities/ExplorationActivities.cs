@@ -3,10 +3,10 @@ using Dawnsbury.Auxiliary;
 using Dawnsbury.Core;
 using Dawnsbury.Core.CharacterBuilder.AbilityScores;
 using Dawnsbury.Core.CharacterBuilder.Feats;
-using Dawnsbury.Core.CharacterBuilder.FeatsDb;
 using Dawnsbury.Core.CharacterBuilder.Spellcasting;
 using Dawnsbury.Core.CombatActions;
 using Dawnsbury.Core.Coroutines.Options;
+using Dawnsbury.Core.Coroutines.Options.Reactive;
 using Dawnsbury.Core.Creatures;
 using Dawnsbury.Core.Mechanics;
 using Dawnsbury.Core.Mechanics.Core;
@@ -59,7 +59,7 @@ public abstract class ExplorationActivities
             DawnniRequired.CreateInvestigateLogic(investigate);
             yield return investigate;
         }
-        Feat track = new(ModManager.RegisterFeatName("Track"), "You follow tracks and look for signs of enemies.", "You roll survival instead of perception for initiative. If you are a Ranger, at the start of an encounter, you may Hunt Prey as a free action on one creature who acts after you in initiative.",
+        Feat track = new(FeatNames.Track, "You follow tracks and look for signs of enemies.", "You roll survival instead of perception for initiative. If you can Hunt Prey, at the start of an encounter, you may Hunt Prey as a free action on one creature who acts after you in initiative.",
             [ModData.Traits.ExplorationActivity, Trait.Homebrew], null);
         CreateTrackLogic(track);
         yield return track;
@@ -125,6 +125,7 @@ public abstract class ExplorationActivities
                 values.TrainInThisOrSubstitute(Skill.Athletics);
             });
         cadet.Traits.Add(Trait.Homebrew);
+        cadet.FeatGroup = new FeatGroup("Military", 0);
         yield return cadet;
         Feat incredibleScout = new TrueFeat(ModManager.RegisterFeatName("IncredibleScout", "Incredible Scout"), 11, "When you scout, you are particularly alert for danger, granting your allies precious moments to prepare to fight.", "When using the Scout exploration activity, you grant your allies a +2 circumstance bonus to their initiative rolls instead of a +1 circumstance bonus.", [Trait.General])
             .WithPrerequisite(values => values.GetProficiency(Trait.Perception) >= Proficiency.Master, "You must be a master in Perception.").WithPermanentQEffect("When you scout, the bonus is +2 instead of +1.", qf => qf.Id = QEffectIds.GreaterScoutActivity);
@@ -141,9 +142,9 @@ public abstract class ExplorationActivities
         scout.WithPermanentQEffect(null,
             qf =>
             {
-                qf.StartOfCombat = qff =>
+                qf.StartOfCombat = async qff =>
                 {
-                    var bonus = qf.Owner.HasEffect(QEffectIds.GreaterScoutActivity)
+                    int bonus = qf.Owner.HasEffect(QEffectIds.GreaterScoutActivity)
                         ? 2
                         : 1;
                     qff.AddGrantingOfTechnical(cr => cr.FriendOf(qf.Owner), qfTech =>
@@ -153,19 +154,18 @@ public abstract class ExplorationActivities
                     });
                     qf.Owner.Battle.Log(
                         $"{qf.Owner.Name} scouted the area, {qf.Owner.Name} and all allies gain a +{bonus} circumstance bonus to initiative.");
-                    return Task.CompletedTask;
                 };
+                qf.Id = QEffectIds.Scouting;
             });
     }
     private static void CreateAvoidNoticeLogic(Feat avoidNotice)
     {
         avoidNotice.WithPermanentQEffect(null, effect =>
         {
-            Creature self = effect.Owner;
             effect.OfferAlternateSkillForInitiative = _ => Skill.Stealth;
-            effect.StartOfCombat = startOfCombat =>
+            effect.StartOfCombat = async startOfCombat =>
             {
-                string coverText = string.Empty;
+                var coverText = string.Empty;
                 if (!startOfCombat.Owner.Battle.AllCreatures.Any(cr =>
                         cr.EnemyOf(startOfCombat.Owner) && cr.Occupies.FogOfWar != FogOfWar.Blackened &&
                         HiddenRules.CountsAsHavingCoverOrConcealment(startOfCombat.Owner, cr)))
@@ -188,7 +188,6 @@ public abstract class ExplorationActivities
                                                    ? " and is hidden to:\n" + string.Join(", ",
                                                        startOfCombat.Owner.DetectionStatus.EnemiesYouAreHiddenFrom)
                                                    : "."));
-                return Task.CompletedTask;
             };
         });
     }
@@ -197,14 +196,14 @@ public abstract class ExplorationActivities
         hustle.WithPermanentQEffect(null, qf =>
         {
             Creature self = qf.Owner;
-            qf.StartOfCombat = _ =>
+            qf.StartOfCombat = async _ =>
             {
                 self.AddQEffect(new QEffect(ExpirationCondition.ExpiresAtEndOfYourTurn)
                 {
                     BonusToAllSpeeds = _ => new Bonus(self.Abilities.Constitution >= 4 ? 2 : 1, BonusType.Circumstance, "Hustle")
                 });
-                return Task.CompletedTask;
             };
+            qf.Id = QEffectIds.Hustle;
         });
     }
     private static void CreateDefendLogic(Feat defend)
@@ -304,42 +303,44 @@ public abstract class ExplorationActivities
             .WithPermanentQEffect(null, qf =>
             {
                 Creature self = qf.Owner;
+                qf.Id = QEffectIds.Track;
                 qf.OfferAlternateSkillForInitiative = _ => Skill.Survival;
-                var survivalMinusPerception = self.Skills.Get(Skill.Survival) - self.Perception + (ModManager.TryParse("Suli", out Trait suli) && self.HasTrait(suli) ? 1 : 0);
+                int survivalMinusPerception = self.Skills.Get(Skill.Survival) - self.Perception + (ModManager.TryParse("Suli", out Trait suli) && self.HasTrait(suli) ? 1 : 0);
                 if (survivalMinusPerception < 0)
                 {
                     qf.BonusToInitiative = _ => new Bonus(survivalMinusPerception, BonusType.Untyped, "Track");
                 }
-                if (self.PersistentCharacterSheet?.Class is {ClassTrait: Trait.Ranger})
-                    qf.StartOfCombat = async _ =>
-                    {
-                        List<Creature> possibleTargets = [];
-                        foreach (Creature target in self.Battle.AllCreatures.Where(cr => self.Initiative >= cr.Initiative && cr.EnemyOf(self)))
-                        {
-                            possibleTargets.Add(target);
-                        }
-                        if (Possibilities.Create(self).Filter(ap =>
+                qf.StartOfCombatReaction = _ =>
+                {
+                    List<Creature> possibleTargets =
+                        [.. self.Battle.AllCreatures.Where(cr => self.Initiative >= cr.Initiative && cr.EnemyOf(self))];
+                    self.RegeneratePossibilities();
+                    if (Possibilities.Create(self).Filter(ap =>
                             {
                                 if (ap.CombatAction.ActionId != ActionId.HuntPrey)
                                     return false;
                                 ap.CombatAction.ActionCost = 0;
                                 ap.RecalculateUsability();
                                 return true;
-                            }).CreateActions(true).FirstOrDefault(pw => pw.Action.ActionId == ActionId.HuntPrey) is CombatAction hunt)
+                            }).CreateActions(true)
+                            .FirstOrDefault(pw => pw.Action.ActionId == ActionId.HuntPrey) is not CombatAction hunt)
+                        return null;
+                    if (possibleTargets.Count > 0)
+                    {
+                        return ReactionOption.CreateCustom("Hunt Prey", "Choose a creature lower than you in initiative to hunt prey.", IllustrationName.HuntPrey, self, async () =>
                         {
-                            if (possibleTargets.Count > 0)
+                            Creature? result = await self.Battle.AskToChooseACreature(self, possibleTargets,
+                                IllustrationName.HuntPrey, "Target a creature with hunt prey?",
+                                "Target this creature", "pass");
+                            if (result != null)
                             {
-                                Creature? result = await self.Battle.AskToChooseACreature(self, possibleTargets,
-                                    IllustrationName.HuntPrey, "Target a creature with hunt prey?",
-                                    "Target this creature", "pass");
-                                if (result != null)
-                                {
-                                    ChosenTargets target = ChosenTargets.CreateSingleTarget(result);
-                                    await self.Battle.GameLoop.FullCast(hunt, target);
-                                }
+                                ChosenTargets target = ChosenTargets.CreateSingleTarget(result);
+                                await self.Battle.GameLoop.FullCast(hunt, target);
                             }
-                        }
-                    };
+                        });
+                    }
+                    return null;
+                };
             });
     }
     private static void CreateImpersonateLogic(Feat impersonate)
@@ -391,9 +392,9 @@ public abstract class ExplorationActivities
                 {
                     Creature self = effect.Owner;
                     if (!self.Battle.AllCreatures.Where(cr => cr.FriendOf(self))
-                            .Any(creature => creature.HasFeat(FeatNames.ScoutActivity))) return;
+                            .Any(creature => creature.HasEffect(QEffectIds.Scouting))) return;
                     if (!ModManager.TryParse("FC_CommanderClass", out FeatName commander) || !self.HasFeat(commander) || self.Level < 3 || !self.Battle.AllCreatures.Any(enemy => enemy.EnemyOf(self) && self.CanSee(enemy)))
-                        self.AddQEffect(new QEffect()
+                        self.AddQEffect(new QEffect
                         {
                             OfferAlternateSkillForInitiative = _ => Skills.WarfareLore,
                         });
@@ -401,7 +402,7 @@ public abstract class ExplorationActivities
                     {
                         CombatAction initSwap = CombatAction.CreateSimple(self, "initSwap", Trait.DoNotShowInCombatLog, Trait.DoNotShowOverheadOfActionName, Trait.DoNotShowOverheadOfCheckResult, Trait.Basic).WithActionCost(0);
                         initSwap.Target = Target.Self();
-                        initSwap.WithEffectOnEachTarget((_, _, _, _) =>
+                        initSwap.WithEffectOnEachTarget( async (_, _, _, _) =>
                         {
                             int roll = R.NextD20();
                             CheckBreakdown breakdown = CombatActionExecution.BreakdownAttack(
@@ -416,19 +417,17 @@ public abstract class ExplorationActivities
                                         new ActiveRollSpecification(TaggedChecks.SkillCheck(Skills.WarfareLore),
                                             Checks.FlatDC(10))), self);
                             CheckBreakdownResult result = new(breakdown, roll);
-                            List<Bonus> initiativeBonuses = [];
-                            foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToInitiative != null))
-                            {
-                                Bonus bonus = qEffect.BonusToInitiative!.Invoke(qEffect)!;
-                                initiativeBonuses.Add(bonus);
-                            }
-                            List<Bonus> skillBonuses = [];
-                            foreach (QEffect qEffect in self.QEffects.Where(qf => qf.BonusToSkills?.Invoke(Skills.WarfareLore) != null))
-                            {
-                                Bonus bonus = qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!;
-                                skillBonuses.Add(bonus);
-                            }
-                            int maxStatus = 0;
+                            List<Bonus> initiativeBonuses =
+                            [
+                                .. self.QEffects.Where(qf => qf.BonusToInitiative != null)
+                                    .Select(qEffect => qEffect.BonusToInitiative!.Invoke(qEffect)!)
+                            ];
+                            List<Bonus> skillBonuses =
+                            [
+                                .. self.QEffects.Where(qf => qf.BonusToSkills?.Invoke(Skills.WarfareLore) != null)
+                                    .Select(qEffect => qEffect.BonusToSkills!.Invoke(Skills.WarfareLore)!)
+                            ];
+                            var maxStatus = 0;
                             if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Status) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Status))
                             {
                                 maxStatus = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Status)
@@ -466,7 +465,7 @@ public abstract class ExplorationActivities
                                     .Where(bonus => bonus.BonusType == BonusType.Circumstance)
                                     .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            int maxItem = 0;
+                            var maxItem = 0;
                             if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Item) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Item))
                             {
                                 maxItem = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Item)
@@ -485,7 +484,7 @@ public abstract class ExplorationActivities
                                     .Where(bonus => bonus.BonusType == BonusType.Item)
                                     .MaxBy(bonus => bonus.Amount)!.Amount;
                             }
-                            int untyped = 0;
+                            var untyped = 0;
                             if (initiativeBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped) && skillBonuses.Any(bonus => bonus.BonusType == BonusType.Untyped))
                             {
                                 untyped = Math.Max(initiativeBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount), skillBonuses.Where(bonus => bonus.BonusType == BonusType.Untyped).Sum(bonus => bonus.Amount));
@@ -504,12 +503,11 @@ public abstract class ExplorationActivities
                                 totalValue = totalBonus + result.D20Roll;
                             // self.Battle.Log("Your initial initiative was: " + self.Initiative + "; Your reroll was: " +
                             //                 totalValue);
-                            if (totalValue <= self.Initiative) return Task.CompletedTask;
+                            if (totalValue <= self.Initiative) return;
                             self.Initiative = totalValue;
                             self.Battle.Log(
                                 "{Green}{b}Battle Planner{/b}{/Green} You rerolled your initiative and got a higher value!");
                             self.RecalculateLandSpeedAndInitiative();
-                            return Task.CompletedTask;
                         });
                         await self.Battle.GameLoop.FullCast(initSwap);
                     }
@@ -523,21 +521,20 @@ public abstract class ExplorationActivities
                 "You must have at least 14 Constitution.")
             .WithPermanentQEffect(null, effect =>
             {
-                effect.StartOfCombat = _ =>
+                effect.StartOfCombat = async _ =>
                 {
                     Creature self = effect.Owner;
-                    if (self.HasFeat(FeatNames.Hustle))
+                    if (self.HasEffect(QEffectIds.Hustle))
                     {
                         effect.AddGrantingOfTechnical(cr => cr.FriendOfAndNotSelf(self), qfTech =>
                         {
-                            if (!qfTech.Owner.HasFeat(FeatNames.Hustle))
+                            if (!qfTech.Owner.HasEffect(QEffectIds.Hustle))
                                 qfTech.Owner.AddQEffect(new QEffect(ExpirationCondition.ExpiresAtEndOfYourTurn)
                                 {
                                     BonusToAllSpeeds = _ => new Bonus(self.Abilities.Constitution >= 4 ? 2 : 1, BonusType.Circumstance, "Hustle")
                                 });
                         });
                     }
-                    return Task.CompletedTask;
                 };
             });
     }
